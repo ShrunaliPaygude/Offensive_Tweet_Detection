@@ -1,33 +1,44 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import pandas as pd
 import numpy as np
 import copy
 from tqdm import tqdm
 
+import re
+import nltk
+nltk.download('punkt')
+nltk.download('stopwords')
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import LancasterStemmer,WordNetLemmatizer
+
+import warnings
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC, LinearSVC
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report,plot_confusion_matrix
+from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC, LinearSVC
+from sklearn.naive_bayes import GaussianNB, MultinomialNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
+import warnings
+
 import pprint
 pp = pprint.PrettyPrinter(indent=5)
 
 
-# In[2]:
+
 
 
 print("reading data set....")
 training_data_set = pd.read_csv("/Users/prajwalkrishn/Desktop/My_Computer/project - Dsci 601/Offensive_Tweet_Detection/Dataset/MOLID.csv")
 print("Done reading....")
-
-
-# In[3]:
-
-
-training_data_set.head(5)
-
-
-# In[4]:
 
 
 tweets = training_data_set[["tweet"]]
@@ -38,60 +49,17 @@ level_C_labels = training_data_set.query("subtask_b == 'TIN'")[["subtask_c"]]
 All_Cleaned_tweets = copy.deepcopy(tweets)
 
 
-# In[5]:
-
-
-##Data Cleaning and Pre-Processing
-
-
-# In[6]:
-
-
-tweets.head(5)
-
-
-# In[7]:
-
-
-level_A_labels.head(5)
-
-
-# In[8]:
-
-
-level_B_labels.head(5)
-
-
-# In[9]:
-
-
-level_C_labels.head(5)
-
-
-# In[10]:
-
-
-All_Cleaned_tweets.head(5)
-
-
-# In[11]:
-
-
-import re
-import nltk
-nltk.download('punkt')
-nltk.download('stopwords')
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import LancasterStemmer,WordNetLemmatizer
 lancaster = LancasterStemmer()
 wordNet = WordNetLemmatizer()
 
 
-# In[14]:
-
 
 def remove_webTags_UserNames_Noise(tweet):
+	''' 
+	Removes the username tags which start with the special character "@" on Twitter.
+	# @param tweet String that contains the tweet.
+	# @return the tweet containing only alphabets, both lowercase and uppercase.
+	'''
     things_to_be_removed_from_tweets = ['URL','@USER','\'ve','n\'t','\'s','\'m']
     
     for things in things_to_be_removed_from_tweets:
@@ -99,7 +67,12 @@ def remove_webTags_UserNames_Noise(tweet):
     
     return re.sub(r'[^a-zA-Z]', ' ', tweet)
 
+
 def stop_words_removal(tokens):
+    '''
+    Removes stop words from the tweets.
+    @param tokens
+    '''
     cleaned_tokens = []
     stop = set(stopwords.words('english'))
     for token in tokens:
@@ -110,10 +83,20 @@ def stop_words_removal(tokens):
     return cleaned_tokens
 
 def tokenize(tweet):
+    '''
+    Tokenises a tweet into words.
+    @param tweet String containing the tweet to be tokenised.
+    @return word separated from the tweet.
+    '''
     lower_cased_tweet = tweet.lower()
     return word_tokenize(lower_cased_tweet)
 
 def stemming(tokens):
+	'''
+	Stems a passed list of token to their base word. "Eatable", "Eaten" will become "Eat".
+	@param tokens a list of tokens that are to be stemmed.
+	@return cleaned_tokens returns a list of stemmed tokens.
+	'''
     cleaned_tokens = []
     for token in tokens:
         token = lancaster.stem(token)
@@ -122,6 +105,11 @@ def stemming(tokens):
     return cleaned_tokens
 
 def lemmatization(tokens):
+	'''
+	Converts a word to it's base word.
+	@param tokens a list of tokens that are to be stemmed.
+	@return cleaned_tokens returns a list of stemmed tokens.
+	'''
     cleaned_tokens = []
     for token in tokens:
         token = wordNet.lemmatize(token)
@@ -129,8 +117,6 @@ def lemmatization(tokens):
             cleaned_tokens.append(token)
     return cleaned_tokens
 
-
-# In[15]:
 
 
 tqdm.pandas(desc = "clean...")
@@ -151,18 +137,15 @@ All_Cleaned_tweets['tokens'] = All_Cleaned_tweets['tokens'].progress_apply(lemma
 text_vector = All_Cleaned_tweets['tokens'].tolist()
 
 
-# In[16]:
 
-
-All_Cleaned_tweets.head(5)
-
-
-# In[17]:
-
-
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 def tfid(text_vector):
+	'''
+	Converts the passed raw document to td-idf feature form.
+	Uses fit() and transform() on a TdidfVectorizer object.
+	@param text_vector tweets to be converted into tf-idf feature form.
+	@return vectors returns the tweets converted into tf-idf features.
+	'''
     vectorizer = TfidfVectorizer()
     untokenized_data =[' '.join(tweet) for tweet in tqdm(text_vector, "Vectorizing...")]
     vectorizer = vectorizer.fit(untokenized_data)
@@ -170,6 +153,13 @@ def tfid(text_vector):
     return vectors
   
 def get_vectors(vectors, labels, keyword):
+	'''
+	Returns a matrix for vectors. Zips vectors and labels IF and only if length of vector list is the same as length of the labels list. 
+	Else, the function gets terminated.
+	@param vectors These are the vectors for a given label.
+	@param labels These are the label values for the given label.
+	@param keyword which is the label to annotate for.
+	'''
     if len(vectors) != len(labels):
         print("Unmatching sizes!")
         return
@@ -179,8 +169,6 @@ def get_vectors(vectors, labels, keyword):
             result.append(vector)
     return result
 
-
-# In[18]:
 
 
 vectors_level_a = tfid(text_vector) # Numerical Vectors A
@@ -193,230 +181,97 @@ vectors_level_c = get_vectors(vectors_level_b, labels_level_b, "TIN") # Numerica
 labels_level_c = level_C_labels['subtask_c'].values.tolist() # Subtask C Labels
 
 
-# In[19]:
 
 
-pp.pprint(vectors_level_a)
+print("SVM model experiment begins on Level A classification ...")
 
+train_vectors_level_A, test_vectors_level_A, train_labels_level_A, test_labels_level_A = train_test_split(vectors_level_a[:], labels_level_a[:], train_size=0.70)
 
-# In[20]:
-
-
-pp.pprint(labels_level_c)
-
-
-# In[21]:
-
-
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC, LinearSVC
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.model_selection import GridSearchCV
-from sklearn.linear_model import LogisticRegression
-import warnings
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_a[:], labels_level_a[:], train_size=0.70)
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_b[:], labels_level_b[:], train_size=0.75)
-
-train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_c[:], labels_level_c[:], train_size=0.75)
-
-print("fit begins...")
-warnings.filterwarnings(action='ignore')
-classifier = DecisionTreeClassifier(max_depth=800, min_samples_split=5)
-params = {'criterion':['gini','entropy']}
-classifier = GridSearchCV(classifier, params, cv=3, n_jobs=4)
-classifier.fit(train_vectors, train_labels)
-classifier = classifier.best_estimator_
-print("fit complete....")
-
-print("calculating accuracy....")
-accuracy = accuracy_score(train_labels, classifier.predict(train_vectors))
-print("Training Accuracy:", accuracy)
-test_predictions = classifier.predict(test_vectors)
-accuracy = accuracy_score(test_labels, test_predictions)
-print("Test Accuracy:", accuracy)
-print("Confusion Matrix:", )
-print(confusion_matrix(test_labels, test_predictions))
-print(classification_report(test_labels,test_predictions))
-
-
-# In[ ]:
-
-
-print("SVM model experiment begins ...")
-import warnings
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC, LinearSVC
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report,plot_confusion_matrix
-from sklearn.model_selection import GridSearchCV
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_a[:], labels_level_a[:], train_size=0.70)
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_b[:], labels_level_b[:], train_size=0.75)
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_c[:], labels_level_c[:], train_size=0.75)
-
-classNames = np.unique(test_labels)
-print("fit begins...")
+classNames = np.unique(test_labels_level_A)
+print("Training begins on Level A classification...")
 warnings.filterwarnings(action='ignore')
 classifiersvc = SVC()
 print(classifiersvc.get_params().keys())
 param_grid = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],'C': [1, 10, 100, 1000]}]
 classifierGrid = GridSearchCV(classifiersvc, param_grid, refit = True, verbose=2)
-classifierGrid.fit(train_vectors, train_labels)
+classifierGrid.fit(train_vectors_level_A, train_labels_level_A)
 classifierGrid = classifierGrid.best_estimator_
-print("fit complete....")
+print("Training complete....")
 
 
 print("calculating accuracy....")
-accuracy = accuracy_score(train_labels, classifierGrid.predict(train_vectors))
+accuracy = accuracy_score(train_labels_level_A, classifierGrid.predict(train_vectors_level_A))
 print("Training Accuracy:", accuracy)
-test_predictions = classifierGrid.predict(test_vectors)
-accuracy = accuracy_score(test_labels, test_predictions)
+test_predictions = classifierGrid.predict(test_vectors_level_A)
+accuracy = accuracy_score(test_labels_level_A, test_predictions)
 print("Test Accuracy:", accuracy)
-print("Confusion Matrix:", )
-matrix = confusion_matrix(test_labels, test_predictions)
-print(confusion_matrix(test_labels, test_predictions))
-print(classification_report(test_labels,test_predictions))
+print("Confusion Matrix:")
+matrix_level_A = confusion_matrix(test_labels_level_A, test_predictions)
+print(matrix_level_A)
+print(classification_report(test_labels_level_A,test_predictions))
 
-plottedCM = plot_confusion_matrix(classifierGrid, test_vectors, test_labels,display_labels=classNames, cmap=plt.cm.Blues)
+plottedCM = plot_confusion_matrix(classifierGrid, test_vectors_level_A, test_labels_level_A,display_labels=classNames, cmap=plt.cm.Blues)
 plt.show()
 
 
-# In[ ]:
 
 
-print("RandomForest model experiment begins ...")
-import warnings
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.model_selection import GridSearchCV
 
+train_vectors_level_B, test_vectors_level_B, train_labels_level_B, test_labels_level_B = train_test_split(vectors_level_b[:], labels_level_b[:], train_size=0.75)
 
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_a[:], labels_level_a[:], train_size=0.70)
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_b[:], labels_level_b[:], train_size=0.75)
-
-train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_c[:], labels_level_c[:], train_size=0.75)
-
-print("fit begins...")
+classNames = np.unique(test_labels_level_B)
+print("Training begins on Level B classification...")
 warnings.filterwarnings(action='ignore')
-classifierRFC = RandomForestClassifier(n_jobs=-1,max_features= 'sqrt' ,n_estimators=50, oob_score = True) 
-print(classifierRFC.get_params().keys())
-param_grid = { 
-    'n_estimators': [200, 700],
-    'max_features': ['auto', 'sqrt', 'log2']
-}
-classifierGrid = GridSearchCV(classifierRFC, param_grid, refit = True, verbose=2)
-classifierGrid.fit(train_vectors, train_labels)
+classifiersvc = SVC()
+print(classifiersvc.get_params().keys())
+param_grid = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],'C': [1, 10, 100, 1000]}]
+classifierGrid = GridSearchCV(classifiersvc, param_grid, refit = True, verbose=2)
+classifierGrid.fit(train_vectors_level_B, train_labels_level_B)
 classifierGrid = classifierGrid.best_estimator_
-print("fit complete....")
+print("Training complete....")
 
 
 print("calculating accuracy....")
-accuracy = accuracy_score(train_labels, classifierGrid.predict(train_vectors))
+accuracy = accuracy_score(train_labels_level_B, classifierGrid.predict(train_vectors_level_B))
 print("Training Accuracy:", accuracy)
-test_predictions = classifierGrid.predict(test_vectors)
-accuracy = accuracy_score(test_labels, test_predictions)
+test_predictions = classifierGrid.predict(test_vectors_level_B)
+accuracy = accuracy_score(test_labels_level_B, test_predictions)
 print("Test Accuracy:", accuracy)
-print("Confusion Matrix:", )
-print(confusion_matrix(test_labels, test_predictions))
-print(classification_report(test_labels,test_predictions))
+print("Confusion Matrix:")
+matrix_level_B = confusion_matrix(test_labels_level_B, test_predictions)
+print(matrix_level_B)
+print(classification_report(test_labels_level_B,test_predictions))
+
+plottedCM = plot_confusion_matrix(classifierGrid, test_vectors_level_B, test_labels_level_B, display_labels=classNames, cmap=plt.cm.Blues)
+plt.show()
 
 
-# In[ ]:
 
 
-print("MNB model experiment begins ...")
-import warnings
-from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.model_selection import GridSearchCV
+train_vectors_level_C, test_vectors_level_C, train_labels_level_C, test_labels_level_C = train_test_split(vectors_level_c[:], labels_level_c[:], train_size=0.75)
 
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_a[:], labels_level_a[:], train_size=0.70)
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_b[:], labels_level_b[:], train_size=0.75)
-
-train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_c[:], labels_level_c[:], train_size=0.75)
-
-print("fit begins...")
+classNames = np.unique(test_labels_level_C)
+print("Training begins on Level C classification...")
 warnings.filterwarnings(action='ignore')
-classifierMNB = MultinomialNB()
-# print(classifierMNB.get_params().keys())
-param_grid = { 
-    'alpha': [1, 10, 100, 1000],
-    'fit_prior': [True, False]
-}
-classifierGrid = GridSearchCV(classifierMNB, param_grid, refit = True, verbose=2, n_jobs=2)
-classifierGrid.fit(train_vectors, train_labels)
+classifiersvc = SVC()
+print(classifiersvc.get_params().keys())
+param_grid = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],'C': [1, 10, 100, 1000]}]
+classifierGrid = GridSearchCV(classifiersvc, param_grid, refit = True, verbose=2)
+classifierGrid.fit(train_vectors_level_C, train_labels_level_C)
 classifierGrid = classifierGrid.best_estimator_
-print("fit complete....")
+print("Training complete....")
 
 
 print("calculating accuracy....")
-accuracy = accuracy_score(train_labels, classifierGrid.predict(train_vectors))
+accuracy = accuracy_score(train_labels_level_C, classifierGrid.predict(train_vectors_level_C))
 print("Training Accuracy:", accuracy)
-test_predictions = classifierGrid.predict(test_vectors)
-accuracy = accuracy_score(test_labels, test_predictions)
+test_predictions = classifierGrid.predict(test_vectors_level_C)
+accuracy = accuracy_score(test_labels_level_C, test_predictions)
 print("Test Accuracy:", accuracy)
-print("Confusion Matrix:", )
-print(confusion_matrix(test_labels, test_predictions))
-print(classification_report(test_labels,test_predictions))
+print("Confusion Matrix:")
+matrix_level_C = confusion_matrix(test_labels_level_C, test_predictions)
+print(matrix_level_C)
+print(classification_report(test_labels_level_C,test_predictions))
 
-
-# In[ ]:
-
-
-print("KNN model experiment begins ...")
-import warnings
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.model_selection import GridSearchCV
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_a[:], labels_level_a[:], train_size=0.70)
-
-#train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_b[:], labels_level_b[:], train_size=0.75)
-
-train_vectors, test_vectors, train_labels, test_labels = train_test_split(vectors_level_c[:], labels_level_c[:], train_size=0.75)
-
-print("fit begins...")
-warnings.filterwarnings(action='ignore')
-classifierKNN = KNeighborsClassifier()
-#print(classifierKNN.get_params().keys())
-param_grid = { 
-    'n_neighbors': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-    'weights': ['uniform', 'distance'],
-    'n_jobs': [-1]
-}
-classifierGrid = GridSearchCV(classifierKNN, param_grid, refit = True, verbose=2, n_jobs=2)
-classifierGrid.fit(train_vectors, train_labels)
-classifierGrid = classifierGrid.best_estimator_
-print("fit complete....")
-
-
-print("calculating accuracy....")
-accuracy = accuracy_score(train_labels, classifierGrid.predict(train_vectors))
-print("Training Accuracy:", accuracy)
-test_predictions = classifierGrid.predict(test_vectors)
-accuracy = accuracy_score(test_labels, test_predictions)
-print("Test Accuracy:", accuracy)
-print("Confusion Matrix:", )
-print(confusion_matrix(test_labels, test_predictions))
-print(classification_report(test_labels,test_predictions))
-
-
-# In[ ]:
-
-
-
-
+plottedCM = plot_confusion_matrix(classifierGrid, test_vectors_level_C, test_labels_level_C, display_labels=classNames, cmap=plt.cm.Blues)
+plt.show()
