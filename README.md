@@ -8,7 +8,7 @@ Proposing a solution to tackle this problem by generating an automated tool that
 # Tools or Technoligies used 
 - Scikit Learn
 - NLTK
-- TQDM
+- TQDM -- https://tqdm.github.io/
 
 ## Classifiers trained or experimented on 
 
